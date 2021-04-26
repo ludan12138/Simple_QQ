@@ -38,20 +38,25 @@ int main(int argc,char *argv[])
     if(client.connectToServer(argv[1],atoi(argv[2]))){
         cout<<"connect success\n";
         while(1){
-            cout<<">>";
+            cout<<"(offline)>>";
             string cmd;
             cin>>cmd;
-            
-                //case "help": client.print_help(); break;
-                //case "exit": return 0;
-                if(cmd=="login") {
-                    memset(cmd_buf,0,sizeof(cmd_buf));
-                    strcpy(cmd_buf,cmd.c_str());
-                    client.Send(cmd_buf,strlen(cmd_buf));
-                    client.login();
-                    break;
-                }
-                
+            //case "help": client.print_help(); break;
+            //case "exit": return 0;
+            if(cmd=="login") {
+                memset(cmd_buf,0,sizeof(cmd_buf));
+                strcpy(cmd_buf,cmd.c_str());
+                client.Send(cmd_buf,strlen(cmd_buf));
+                client.login();
+                continue;
+            }
+            if(cmd=="help"){
+                client.print_help();
+                continue;
+            }
+            if(cmd=="exit"){
+                break;
+            }
         }
     };  
 }
@@ -97,13 +102,16 @@ bool qqClient::login(){
     memset(buf,0,sizeof(buf));
     strcpy(buf,password.c_str());
     Send(buf,strlen(buf));*/
-
+    //skip while when login success
     while(1){
         memset(buf,0,sizeof(buf));
         Recv(buf,sizeof(buf));
         cout<<buf;
-        if(!strcmp(buf,"login success")||!strcmp(buf,"Create success!")){
+        if(!strcmp(buf,"login success")){
             break;
+        }
+        if(!strcmp(buf,"Create success!")){
+            continue;
         }
         string reply;
         //getline(cin,reply);
@@ -112,6 +120,34 @@ bool qqClient::login(){
         strcpy(buf,reply.c_str());
         Send(buf,strlen(buf));
     }
+    //after login success
+    while(1){
+        cout<<"(online)>>";
+        string cmd;
+        getline(cin,cmd);
+        memset(buf,0,sizeof(buf));
+        strcpy(buf,cmd.c_str());
+        Send(buf,strlen(buf));
+        if(cmd=="logoff"){
+            break;
+        }
+        if(cmd=="list"){
+            while(1){
+                memset(buf,0,sizeof(buf));
+                Recv(buf,sizeof(buf));
+                if(!strcmp(buf,"finish")) break;                
+                cout<<buf<<endl;
+            }
+            continue;
+        }
+        if(cmd=="connect"){
+
+        }
+        if(cmd=="send"){
+
+        }
+    }
+
 }
 
 void qqClient::print_help(){
