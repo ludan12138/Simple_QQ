@@ -15,6 +15,7 @@ class qqClient{
 public:
     int m_sockfd;
     int m_sockfd_c;
+    int m_sockfd_f;
 
     qqClient();
 
@@ -32,6 +33,7 @@ public:
 };
 struct param{
     int fd_c;
+    int fd_f;
     qqClient *client;
 };
 
@@ -47,6 +49,40 @@ void *pth_main(void *arg){
     }
 
 }
+
+void* pth_main1(void *arg){
+    param tmp=*(param*)arg;
+    int clientfd_f=tmp.fd_f;
+    char buf[1024];
+    while(1){
+        char fileName[100];
+        FILE* fp=0;
+        string name;
+        string filen;
+        //recv sender name
+        memset(buf,0,sizeof(buf));
+        recv(clientfd_f,buf,sizeof(buf),0);
+        name=buf;
+        //recv file name
+        memset(buf,0,sizeof(buf));
+        recv(clientfd_f,buf,sizeof(buf),0);
+        filen=buf;
+        filen="file/"+filen;
+        strcpy(fileName,filen.c_str());
+        //cout<<fileName;
+        fp=fopen(fileName,"w");
+        int i=0;
+        while(1){
+            memset(buf,0,sizeof(buf));
+            recv(clientfd_f,buf,sizeof(buf),0);
+            //cout<<(i++)<<buf;
+            if(!strcmp(buf,"success")) break;
+            fwrite(buf,1,strlen(buf),fp);
+        }
+        cout<<name<<" send you a file:"<<fileName<<endl;
+        fclose(fp);
+    }
+}
 int main(int argc,char *argv[])
 {
     qqClient client;
@@ -57,9 +93,14 @@ int main(int argc,char *argv[])
         pthread_t pthid;
         param param1;
         param1.fd_c=client.m_sockfd_c;
+        param1.fd_f=client.m_sockfd_f;
         param1.client=&client;
         if(pthread_create(&pthid,NULL,pth_main,&param1)!=0){
             cout<<"pthreat_create failed\n";
+            return -1;
+        }
+        if(pthread_create(&pthid,NULL,pth_main1,&param1)!=0){
+            cout<<"pthreat_create 1 failed\n";
             return -1;
         }
         while(1){
@@ -91,14 +132,20 @@ int main(int argc,char *argv[])
 
 qqClient::qqClient(){
     m_sockfd=0;
+    m_sockfd_c=0;
+    m_sockfd_f=0;
 }
 
 qqClient::~qqClient() {
     if (m_sockfd!=0) close(m_sockfd);
+    if (m_sockfd_c!=0) close(m_sockfd_c);
+    if (m_sockfd_f!=0) close(m_sockfd_f);
 }
 
 bool qqClient::connectToServer(const char *serverip,const int port){
     m_sockfd=socket(AF_INET,SOCK_STREAM,0);
+    m_sockfd_c=socket(AF_INET,SOCK_STREAM,0);
+    m_sockfd_f=socket(AF_INET,SOCK_STREAM,0);
 
     sockaddr_in servaddr;
     memset(&servaddr,0,sizeof(servaddr));
@@ -107,21 +154,21 @@ bool qqClient::connectToServer(const char *serverip,const int port){
     servaddr.sin_addr.s_addr = inet_addr(serverip);
 
     if(connect(m_sockfd,(sockaddr*)&servaddr,sizeof(servaddr))!=0){
-        close(m_sockfd); m_sockfd=0; return false;
+        close(m_sockfd); close(m_sockfd_c); close(m_sockfd_f);
+        m_sockfd=0; m_sockfd_c=0; m_sockfd_f=0;
+        return false;
     }
-
     sleep(1);
-
-    m_sockfd_c=socket(AF_INET,SOCK_STREAM,0);
-
-    sockaddr_in servaddr_c;
-    memset(&servaddr_c,0,sizeof(servaddr_c));
-    servaddr_c.sin_family = AF_INET;
-    servaddr_c.sin_port = htons(port);
-    servaddr_c.sin_addr.s_addr = inet_addr(serverip);
-
-    if(connect(m_sockfd_c,(sockaddr*)&servaddr_c,sizeof(servaddr_c))!=0){
-        close(m_sockfd_c); m_sockfd_c=0; return false;
+    if(connect(m_sockfd_c,(sockaddr*)&servaddr,sizeof(servaddr))!=0){
+        close(m_sockfd); close(m_sockfd_c); close(m_sockfd_f);
+        m_sockfd=0; m_sockfd_c=0; m_sockfd_f=0;
+        return false;
+    }
+    sleep(1);
+    if(connect(m_sockfd_f,(sockaddr*)&servaddr,sizeof(servaddr))!=0){
+        close(m_sockfd); close(m_sockfd_c); close(m_sockfd_f);
+        m_sockfd=0; m_sockfd_c=0; m_sockfd_f=0;
+        return false;
     }
 
     return true;
@@ -170,7 +217,7 @@ bool qqClient::login(){
             continue;
         }
         if(cmd=="chat"){
-            cout<<"Who do you to chat with?(type user's name):";
+            cout<<"Who do you want to chat with?(type user's name):";
             string sendTo;
             cin>>sendTo;
 
@@ -215,10 +262,66 @@ bool qqClient::login(){
             continue;
         }
         if(cmd=="send"){
+            cout<<"Who do you want to send file?(type user's name):";
+            string sendTo;
+            getline(cin,sendTo);
 
+            memset(buf,0,sizeof(buf));
+            strcpy(buf,sendTo.c_str());
+            Send(buf,strlen(buf));
+
+            while(1){
+                memset(buf,0,sizeof(buf));
+                Recv(buf,sizeof(buf));
+                cout<<buf;
+                if(!strcmp(buf,"Type file path.\n")){
+                    break;
+                }
+                cin>>sendTo;
+                memset(buf,0,sizeof(buf));
+                strcpy(buf,sendTo.c_str());
+                Send(buf,strlen(buf));
+            }
+            
+            string fileName;
+            char file[100];
+            FILE* fp=0;
+            getline(cin,fileName);
+            strcpy(file,fileName.c_str());
+            while( (fp=fopen(file,"r"))==0 ){
+                cout<<"This file is not exits;Choose another one.\nType again:";
+                getline(cin,fileName);
+                strcpy(file,fileName.c_str());
+            }
+            //send file path
+            memset(buf,0,sizeof(buf));
+            strcpy(buf,file);
+            Send(buf,strlen(buf));
+
+            //send file content
+            while(1){
+                //sleep(1);
+                memset(buf,0,sizeof(buf));
+                if(fread(buf,1,sizeof(buf),fp)==0){
+                    sleep(1);
+                    memset(buf,0,sizeof(buf));
+                    sprintf(buf,"success");
+                    Send(buf,strlen(buf));
+                    //cout<<buf;
+                    break;
+                }
+                Send(buf,strlen(buf));
+                //cout<<buf;
+                
+            }
+            //send success
+            cout<<"Send success.\nBack to the command interface.";
+            //cin.get();
+            //fclose(fp);
+            continue;
         }
-    }
 
+    }
 }
 
 void qqClient::print_help(){
