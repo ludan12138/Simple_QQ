@@ -24,15 +24,17 @@ public:
 	int m_listenfd;
 	int m_clientfd[10];//save client's socketfd interact with server
 	int m_clientfd_c[10];//for recv message
+	int m_clientfd_f[10];
 
 	FILE *userInfo;
 	map<string,int> onlineUser;//
+	map<string,int> onlineUser_f;
 	
 	qqServer();
 
 	void start();
 
-	void login(int fd,int fd_c);
+	void login(int fd,int fd_c,int fd_f);
 	
 	bool check(string name);
 
@@ -54,6 +56,7 @@ public:
 struct param{
 	int fd;
 	int fd_c;
+	int fd_f;
 	int id;
 	qqServer *serv;
 };
@@ -84,10 +87,11 @@ void qqServer::start(){
 	
 }
 
-void qqServer::login(int fd,int fd_c){
+void qqServer::login(int fd,int fd_c,int fd_f){
 	char buf[1024];
 	int cltfd=fd;
 	int cltfd_c=fd_c;
+	int cltfd_f=fd_f;
 	//skip while when login success
 	string username,password;
 	while(1){
@@ -172,6 +176,7 @@ void qqServer::login(int fd,int fd_c){
 			send(cltfd,buf,strlen(buf),0);
 			//save user to online list
 			onlineUser[username]=cltfd_c;
+			onlineUser_f[username]=cltfd_f;
 			cout<<username<<" login"<<endl;
 			break;
 		}else{
@@ -179,6 +184,7 @@ void qqServer::login(int fd,int fd_c){
 			sprintf(buf,"login success");
 			send(cltfd,buf,strlen(buf),0);
 			onlineUser[username]=cltfd_c;
+			onlineUser_f[username]=cltfd_f;
 			cout<<username<<" login"<<endl;
 			break;
 		}
@@ -260,7 +266,67 @@ void qqServer::login(int fd,int fd_c){
 			continue;
 		}
 		if(cmd=="send"){
+			string sendTo;
 
+			memset(buf,0,sizeof(buf));
+			recv(cltfd,buf,sizeof(buf),0);
+			sendTo=buf;
+
+			while(!onlineUser.count(sendTo)){
+				memset(buf,0,sizeof(buf));
+				sprintf(buf,"This user is not online,please choose another one.\nWho do you to chat with?(type user's name):");
+				send(cltfd,buf,strlen(buf),0);
+				memset(buf,0,sizeof(buf));
+				recv(cltfd,buf,sizeof(buf),0);
+				sendTo=buf;
+			}
+			int sendToClientfd_f=onlineUser_f[sendTo];
+
+			memset(buf,0,sizeof(buf));
+			sprintf(buf,"Type file path.\n");
+			send(cltfd,buf,strlen(buf),0);
+
+			//recv file path
+			string filePath;
+			memset(buf,0,sizeof(buf));
+			recv(cltfd,buf,sizeof(buf),0);
+			filePath=buf;
+
+			//send sender's name
+			memset(buf,0,sizeof(buf));
+			strcpy(buf,username.c_str());
+			send(sendToClientfd_f,buf,strlen(buf),0);
+			//send reciever file name
+			string file;
+			int pos=filePath.rfind('/');
+			if(pos==-1){
+				file=filePath;
+			}else{
+				file=filePath.substr(pos+1);
+			}
+			memset(buf,0,sizeof(buf));
+			strcpy(buf,file.c_str());
+			send(sendToClientfd_f,buf,strlen(buf),0);
+			cout<<file<<endl;
+			//send file content
+			sleep(1);
+			int i=0;
+			while(1){
+				memset(buf,0,sizeof(buf));
+				recv(cltfd,buf,sizeof(buf),0);
+				//cout<<(i++)<<buf;
+				if(!strcmp(buf,"success")){
+					sleep(1);
+					//cout<<"send success"<<endl;
+					memset(buf,0,sizeof(buf));
+					sprintf(buf,"success");
+					send(sendToClientfd_f,buf,strlen(buf),0);
+					break;
+				}
+				send(sendToClientfd_f,buf,strlen(buf),0);
+				
+			}
+			//cout<<"send success!";
 		}
 	}
 
@@ -311,18 +377,18 @@ bool qqServer::Accept(){
 	while(1){
 		if( (m_clientfd[i]=accept(m_listenfd,0,0))<=0 ) return false;
 		if( (m_clientfd_c[i]=accept(m_listenfd,0,0))<=0 ) return false;
+		if( (m_clientfd_f[i]=accept(m_listenfd,0,0))<=0 ) return false;
 
 		pthread_t pthid;
 		param  param1;
 		param1.fd=m_clientfd[i];
 		param1.fd_c=m_clientfd_c[i];
+		param1.fd_f=m_clientfd_f[i];
 		param1.id=i;
 		param1.serv=this;
 		if(pthread_create(&pthid,NULL,pth_main,&param1)!=0){
 			printf("pthread_crate failed\n"); return false;
 		}
-		
-		
 	}
 }
 
@@ -330,6 +396,7 @@ void *pth_main(void *arg){
 	param tmp=*(param*)arg;
 	int clientfd=tmp.fd;
 	int clientfd_c=tmp.fd_c;
+	int clientfd_f=tmp.fd_f;
 	int client_id=tmp.id;
 	qqServer *serv=tmp.serv;
 	char cmd_buf[100];
@@ -340,7 +407,7 @@ void *pth_main(void *arg){
 		//strcpy(cmd,cmd_buf);
 		cmd=cmd_buf;
 		if(cmd=="login"){
-			serv->login(clientfd,clientfd_c);
+			serv->login(clientfd,clientfd_c,clientfd_f);
 			continue;
 		}
 	}
