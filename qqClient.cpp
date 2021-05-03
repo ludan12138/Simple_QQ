@@ -42,7 +42,6 @@ void *pth_main(void *arg){
     int clientfd_c=tmp.fd_c;
     char buf[1024];
     while(1){
-        //cout<<"i am recving\n";
         memset(buf,0,sizeof(buf));
         recv(clientfd_c,buf,sizeof(buf),0);
         cout<<buf<<endl;
