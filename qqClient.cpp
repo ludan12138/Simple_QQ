@@ -62,12 +62,20 @@ void* pth_main1(void *arg){
         memset(buf,0,sizeof(buf));
         recv(clientfd_f,buf,sizeof(buf),0);
         name=buf;
+        //reply ok
+        memset(buf,0,sizeof(buf));
+        sprintf(buf,"ok");
+        send(clientfd_f,buf,strlen(buf),0);
         //recv file name
         memset(buf,0,sizeof(buf));
         recv(clientfd_f,buf,sizeof(buf),0);
         filen=buf;
         filen="file/"+filen;
         strcpy(fileName,filen.c_str());
+        //reply ok
+        memset(buf,0,sizeof(buf));
+        sprintf(buf,"ok");
+        send(clientfd_f,buf,strlen(buf),0);
         //cout<<fileName;
         fp=fopen(fileName,"w");
         int i=0;
@@ -211,8 +219,9 @@ bool qqClient::login(){
                 memset(buf,0,sizeof(buf));
                 Recv(buf,sizeof(buf));
                 if(!strcmp(buf,"finish")) break;                
-                cout<<buf<<endl;
+                cout<<buf;
             }
+            cout<<endl;
             continue;
         }
         if(cmd=="chat"){
@@ -296,6 +305,10 @@ bool qqClient::login(){
             memset(buf,0,sizeof(buf));
             strcpy(buf,file);
             Send(buf,strlen(buf));
+            //recv ok
+            memset(buf,0,sizeof(buf));
+            Recv(buf,sizeof(buf));
+            //sleep(1);
 
             //send file content
             while(1){

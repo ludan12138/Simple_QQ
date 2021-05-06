@@ -200,10 +200,11 @@ void qqServer::login(int fd,int fd_c,int fd_f){
 			while(it!=onlineUser.end()){
 				memset(buf,0,sizeof(buf));
 				if(it->first==username){
-					string temp=username+"(you)";
+					string temp=username+"(you) ";
 					strcpy(buf,temp.c_str());
 				}else{
-					strcpy(buf,it->first.c_str());
+					string temp1=it->first+" ";
+					strcpy(buf,temp1.c_str());
 				}
 				send(cltfd,buf,strlen(buf),0);
 				it++;
@@ -291,11 +292,18 @@ void qqServer::login(int fd,int fd_c,int fd_f){
 			memset(buf,0,sizeof(buf));
 			recv(cltfd,buf,sizeof(buf),0);
 			filePath=buf;
+			//reply ok
+			memset(buf,0,sizeof(buf));
+			sprintf(buf,"ok");
+			send(cltfd,buf,strlen(buf),0);
 
 			//send sender's name
 			memset(buf,0,sizeof(buf));
 			strcpy(buf,username.c_str());
 			send(sendToClientfd_f,buf,strlen(buf),0);
+			//recv ok
+			memset(buf,0,sizeof(buf));
+			recv(sendToClientfd_f,buf,sizeof(buf),0);
 			//send reciever file name
 			string file;
 			int pos=filePath.rfind('/');
@@ -308,8 +316,11 @@ void qqServer::login(int fd,int fd_c,int fd_f){
 			strcpy(buf,file.c_str());
 			send(sendToClientfd_f,buf,strlen(buf),0);
 			cout<<file<<endl;
+			//recv ok
+			memset(buf,0,sizeof(buf));
+			recv(sendToClientfd_f,buf,sizeof(buf),0);
 			//send file content
-			sleep(1);
+			//sleep(1);
 			int i=0;
 			while(1){
 				memset(buf,0,sizeof(buf));
